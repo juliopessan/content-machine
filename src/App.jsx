@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import DecryptText from "./components/DecryptText.jsx";
 
 const PILLARS = [
   "AI Agents",
@@ -939,9 +940,16 @@ export default function ContentMachine() {
           from { opacity: 0; }
           to { opacity: 1; }
         }
+        .decrypt-char { color: currentColor; }
+        .decrypt-char[data-state="scramble"] { opacity: 0.45; }
+        .decrypt-char[data-state="lock"] { animation: decryptFlash 380ms cubic-bezier(.2,0,0,1); }
+        @keyframes decryptFlash {
+          0% { opacity: 1; text-shadow: 0 0 10px currentColor; }
+          100% { opacity: 1; text-shadow: 0 0 0 transparent; }
+        }
         @media (prefers-reduced-motion: reduce) {
           .shimmer-text { animation: none; color: #E8916E; }
-          .msg-transition, .rise, .node-active, .typewriter-cursor, .fade-in-rest { animation: none; transition: none; }
+          .msg-transition, .rise, .node-active, .typewriter-cursor, .fade-in-rest, .decrypt-char { animation: none; transition: none; }
         }
       `}</style>
 
@@ -969,11 +977,15 @@ export default function ContentMachine() {
             <Eyebrow>Camada de produção editorial</Eyebrow>
 
             <h1 className="display-face mt-7 text-[clamp(2.9rem,6.2vw,4.6rem)] leading-[0.92] tracking-[-0.035em] font-bold">
-              Um tópico entra.
+              <DecryptText as="span" text="Um tópico entra." stagger={26} />
               <br />
-              <span className="serif-face italic font-normal tracking-[-0.01em]">
-                dois drafts saem.
-              </span>
+              <DecryptText
+                as="span"
+                text="dois drafts saem."
+                className="serif-face italic font-normal tracking-[-0.01em]"
+                stagger={26}
+                startDelay={420}
+              />
             </h1>
 
             <p className="mt-7 text-[17px] leading-relaxed text-[#14150F]/70 max-w-[46ch]">

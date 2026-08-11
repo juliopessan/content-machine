@@ -153,6 +153,51 @@ function buildLinkedinCopyText(l) {
   return `${body}${tags}`;
 }
 
+// Isola a primeira linha do post (o "hook" que o LINKEDIN_SYSTEM exige como
+// scroll-stopper standalone) do resto, para tipar só ela.
+function splitHook(post) {
+  const idx = post.indexOf("\n\n");
+  if (idx === -1) return { hook: post, rest: "" };
+  return { hook: post.slice(0, idx), rest: post.slice(idx + 2) };
+}
+
+function prefersReducedMotion() {
+  return (
+    typeof window !== "undefined" &&
+    window.matchMedia &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  );
+}
+
+// Efeito de máquina de escrever: revela `text` caractere a caractere. Some
+// para nada quando o texto muda ou reduced-motion está ativo (mostra tudo
+// de uma vez).
+function useTypewriter(text, { speed = 20, enabled = true } = {}) {
+  const [count, setCount] = useState(0);
+
+  useEffect(() => {
+    if (!enabled || !text) {
+      setCount(0);
+      return;
+    }
+    if (prefersReducedMotion()) {
+      setCount(text.length);
+      return;
+    }
+    setCount(0);
+    let i = 0;
+    const id = setInterval(() => {
+      i += 1;
+      setCount(i);
+      if (i >= text.length) clearInterval(id);
+    }, speed);
+    return () => clearInterval(id);
+  }, [text, enabled, speed]);
+
+  const done = !enabled || count >= text.length;
+  return { display: text.slice(0, count), done };
+}
+
 // Espelha a ordem de fallback usada em api/generate.js — só para exibição
 // ("opção X da lista") no painel de execução, a chamada real e a chave
 // ficam inteiramente no servidor.
@@ -673,6 +718,17 @@ export default function ContentMachine() {
   const [activeModel, setActiveModel] = useState(null);
   const [fallbackNotice, setFallbackNotice] = useState("");
 
+  const { display: typedHeadline, done: headlineTyped } = useTypewriter(mediumData?.headline || "", {
+    speed: 22,
+    enabled: !!mediumData,
+  });
+  const linkedinHook = linkedinData ? splitHook(linkedinData.post).hook : "";
+  const linkedinRest = linkedinData ? splitHook(linkedinData.post).rest : "";
+  const { display: typedHook, done: hookTyped } = useTypewriter(linkedinHook, {
+    speed: 22,
+    enabled: !!linkedinData,
+  });
+
   useEffect(() => {
     let alive = true;
     loadLessons().then((l) => {
@@ -870,9 +926,22 @@ export default function ContentMachine() {
           from { opacity: 0; transform: translateY(14px); }
           to { opacity: 1; transform: translateY(0); }
         }
+        .typewriter-cursor {
+          display: inline-block;
+          color: #D97757;
+          animation: blink 0.9s step-end infinite;
+        }
+        @keyframes blink {
+          50% { opacity: 0; }
+        }
+        .fade-in-rest { display: inline; animation: fadeIn 450ms ease both; }
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
         @media (prefers-reduced-motion: reduce) {
           .shimmer-text { animation: none; color: #E8916E; }
-          .msg-transition, .rise, .node-active { animation: none; transition: none; }
+          .msg-transition, .rise, .node-active, .typewriter-cursor, .fade-in-rest { animation: none; transition: none; }
         }
       `}</style>
 
@@ -1191,34 +1260,39 @@ export default function ContentMachine() {
                     </button>
                   </div>
 
-                  <h2 className="display-face text-[27px] leading-[1.1] tracking-[-0.02em] font-bold">
-                    {mediumData.headline}
+                  <h2 className="display-face text-[27px] leading-[1.1] tracking-[-0.02em] font-bold min-h-[1.1em]">
+                    {headlineTyped ? mediumData.headline : typedHeadline}
+                    {!headlineTyped && <span className="typewriter-cursor">▏</span>}
                   </h2>
-                  <p className="serif-face italic text-[19px] text-[#14150F]/55 mt-2.5 mb-7">
-                    {mediumData.subtitle}
-                  </p>
+                  <div
+                    className={`transition-opacity duration-500 ${headlineTyped ? "opacity-100" : "opacity-0"}`}
+                  >
+                    <p className="serif-face italic text-[19px] text-[#14150F]/55 mt-2.5 mb-7">
+                      {mediumData.subtitle}
+                    </p>
 
-                  <div className="text-[16px] leading-[1.72] text-[#14150F]/88 space-y-4 overflow-y-auto max-h-[440px] pr-2">
-                    {mediumData.body.split("\n\n").map((para, i) => (
-                      <p key={i}>{renderInlineBold(para, `md-${i}`)}</p>
-                    ))}
+                    <div className="text-[16px] leading-[1.72] text-[#14150F]/88 space-y-4 overflow-y-auto max-h-[440px] pr-2">
+                      {mediumData.body.split("\n\n").map((para, i) => (
+                        <p key={i}>{renderInlineBold(para, `md-${i}`)}</p>
+                      ))}
+                    </div>
+
+                    <div className="flex flex-wrap gap-2 mt-7 pt-6 border-t border-[#14150F]/12">
+                      {mediumData.tags?.map((t, i) => (
+                        <span
+                          key={i}
+                          className="mono-face text-[10px] tracking-[0.1em] text-[#14150F]/55 border border-[#14150F]/20 px-2.5 py-1"
+                        >
+                          {t}
+                        </span>
+                      ))}
+                    </div>
+
+                    <p className="mono-face text-[10px] leading-relaxed text-[#14150F]/40 mt-4">
+                      No Medium, selecione os trechos marcados e aplique negrito na mão. O editor não
+                      converte markdown ao colar.
+                    </p>
                   </div>
-
-                  <div className="flex flex-wrap gap-2 mt-7 pt-6 border-t border-[#14150F]/12">
-                    {mediumData.tags?.map((t, i) => (
-                      <span
-                        key={i}
-                        className="mono-face text-[10px] tracking-[0.1em] text-[#14150F]/55 border border-[#14150F]/20 px-2.5 py-1"
-                      >
-                        {t}
-                      </span>
-                    ))}
-                  </div>
-
-                  <p className="mono-face text-[10px] leading-relaxed text-[#14150F]/40 mt-4">
-                    No Medium, selecione os trechos marcados e aplique negrito na mão. O editor não
-                    converte markdown ao colar.
-                  </p>
                 </div>
               )}
 
@@ -1239,8 +1313,12 @@ export default function ContentMachine() {
                     </button>
                   </div>
 
-                  <div className="text-[16px] leading-[1.72] text-[#14150F]/88 whitespace-pre-wrap flex-1">
-                    {formatLinkedinForDisplay(linkedinData.post)}
+                  <div className="text-[16px] leading-[1.72] text-[#14150F]/88 whitespace-pre-wrap flex-1 min-h-[1.72em]">
+                    {hookTyped ? formatLinkedinForDisplay(linkedinHook) : typedHook}
+                    {!hookTyped && <span className="typewriter-cursor">▏</span>}
+                    {hookTyped && linkedinRest && (
+                      <span className="fade-in-rest">{"\n\n"}{formatLinkedinForDisplay(linkedinRest)}</span>
+                    )}
                   </div>
 
                   {linkedinData.hashtags && linkedinData.hashtags.length > 0 && (

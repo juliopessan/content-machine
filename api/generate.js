@@ -43,7 +43,7 @@ async function requestOnce(model, apiKey, system, userMessage) {
   return { text, truncated: choice.finish_reason === "length", model };
 }
 
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
   if (req.method !== "POST") {
     res.status(405).json({ error: "method_not_allowed" });
     return;
